@@ -107,8 +107,8 @@ static char *heapListPtr = 0;
 
 
 //helper function declaration
-static void* coalesce(void *p);
-static void* extendHeap(size_t words);
+static void* coalesce(void *p); //working Tony
+static void* extendHeap(size_t words);  //finished Tony
 static void* find_fit(size_t sizeNeeded);
 static void* place(void *p, size_t size);
 static void  insertFreeBlock(void *p, size_t blockSize);
@@ -135,7 +135,7 @@ static void* coalesce(void* p){
     size_t prev_alloc_flag = READ_ALLOC(getHeader(prev_block(p)));
     size_t next_alloc_flag = READ_ALLOC(getHeader(next_block(p)));
 
-    size_t currSize = READ_SIZE(getHeader(p)); 
+    size_t totalSize = READ_SIZE(getHeader(p)); 
 
 
     //case 1: allocated | just freed | allocated , so coalesce is possible
@@ -146,12 +146,36 @@ static void* coalesce(void* p){
     else if(prev_alloc_flag && !next_alloc_flag){
       removeFreeBlock(p);
       removeFreeBlock(next_block(p));
-      currSize += READ_SIZE(getHeader(next_block(p))); //read the size of the next block (free)
-      WRITE(getHeader(next_block), blockInfo(size, 0)); //write the header field of this block and mark it free
-      WRITE(getFooter(next_block), blockInfo(size, 0)); //similar 
-
+      totalSize += READ_SIZE(getHeader(next_block(p))); //read the size of the next block (free)
+      WRITE(getHeader(p), blockInfo(size, 0)); //write the header field of this block and mark it free
+      WRITE(getFooter(p), blockInfo(size, 0)); //similar to up there
     }
+    //case 3: free | just freed | allocated, so coalesce with the previous block and then move the pointer to
+    //the previous block address
+    else if(!prev_alloc_flag && next_alloc_flag){
+    	removeFreeBlock(p);
+    	removeFreeBlock(prev_block(p));
+    	totalSize += READ_SIZE(getHeader(prev_block(p)));
+    	WRITE(getFooter(p), blockInfo(totalSize, 0)); //change the curr block's footer (size, free)
+    	WRITE(getHeader(prev_block(p)), blockInfo(totalSize, 0)); 
 
+    	p = prev_block(p); //move the free block pointer to the previous block
+    }
+    //case 4: free| just freed | free, so coalesce with both of them
+    else{
+    	removeFreeBlock(prev_block(p));
+    	removeFreeBlock(p);
+    	removeFreeBlock(next_block(p));
+    	totalSize += READ_SIZE(getHeader(prev_block(p))) + READ_SIZE(getHeader(next_block(p)));
+    	WRITE(getFooter(next_block(p)), blockInfo(totalSize, 0)); //write the footer at the next free block
+    	WRITE(getHeader(prev_block(p)), blockInfo(totalSize, 0)); //write the header at the prev free block
+
+    	p = prev_block(p);
+    }
+    //put the block pointer back into the free seg list
+    insertFreeBlock(p, totalSize);
+
+    return p;
     
 }
 
