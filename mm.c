@@ -107,14 +107,50 @@ static char *heapListPtr = 0;
 
 
 //helper function declaration
-static void* coalesce(void *p); //working Tony
+static void* coalesce(void *p); //finished Tony
 static void* extendHeap(size_t words);  //finished Tony
-static void* find_fit(size_t sizeNeeded);
+static void* findFit(size_t sizeNeeded); // working Tony
 static void* place(void *p, size_t size);
 static void  insertFreeBlock(void *p, size_t blockSize);
 static void  removeFreeBlock(void *p);
 static int mm_check(void); //what does this do?
 
+
+/*
+ * findFit: return the smallest block that can hold the requested data size
+ * scanning from the head of each list, which always holds the biggest data block in this list
+ */
+
+static void* findFit(size_t sizeNeeded){
+	size_t size = sizeNeeded;
+	int listIndex = 0;
+	void* listPtr = null;
+
+	while(listIndex < LISTCOUNT){
+		if(listIndex == LISTCOUNT - 1 || (size <= 1 && (seg_getIndex(segregatedListPtr, listIndex) != NULL)))
+		{
+			listPtr = seg_getIndex(segregatedListPtr, listIndex);
+
+			//we are at a specific sized list, now we traverse the list
+			while((listPtr != NULL) && (sizeNeeded > READ_SIZE(getHeader(listPtr)))){
+				listPtr = seg_prevBlock(listPtr); 
+				//techinically going down the list, but because of the way the memory is structured,
+				//we call prevBlock.
+			}
+
+			//found the location
+			if(listPtr != NULL){
+				break;
+			}
+		}
+		listIndex++; //move along the sizes list
+		size = size >> 1; //track size and if it fits
+
+	}
+
+	return listPtr;
+
+} 
 
 /*
  * removeFreeBlock: remove a free block from the seg_list and update its pre, next pointer
@@ -210,7 +246,7 @@ static void* extendHeap(size_t words){
 }
 
 /* 
- * mm_init - initialize the malloc package.
+ * mm_init - initialize the malloc package. Tony Finished
  */
 int mm_init(void)
 {
