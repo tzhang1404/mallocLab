@@ -24,7 +24,7 @@
  ********************************************************/
 team_t team = {
     /* Team name */
-    "IT",
+    "TI",
     /* First member's full name */
     "Jiawei Zhang",
     /* First member's email address */
@@ -70,7 +70,7 @@ team_t team = {
 //get the next block
 #define next_block(p) ((char *)(p) + READ_SIZE(((char *)(p) - WSIZE)))
 
-//get the previous block
+//get the previous block 
 #define prev_block(p) ((char *)(p) - READ_SIZE(((char *)(p) - DSIZE)))
 
 
@@ -109,11 +109,32 @@ static char *heapListPtr = 0;
 //helper function declaration
 static void* coalesce(void *p); //finished Tony
 static void* extendHeap(size_t words);  //finished Tony
-static void* findFit(size_t sizeNeeded); // working Tony
-static void* place(void *p, size_t size);
+static void* findFit(size_t sizeNeeded); // finished Tony
+static void* place(void *p, size_t size); //working Tony 
 static void  insertFreeBlock(void *p, size_t blockSize);
 static void  removeFreeBlock(void *p);
-static int mm_check(void); //what does this do?
+static int mm_check(void); //basically a debugger, wont call during the acutal submission, for style points
+
+/*
+ * place: mark the size at pointer as used, if the payload is smaller than the free block, coalesce the free block
+ * with the adjacent blocks
+ */
+
+static void* place(void* p, size_t size){
+
+	size_t blockSize = READ_SIZE(getHeader(p));
+	void* nextPtr = NULL; //late will use 
+
+	//break the current block pointed by p from the segregated list
+	removeFreeBlock(p);
+
+
+	//if the difference between block size and payload size is bigger than the min-blocl size
+	//then coalecse
+	if(blockSize - size >= 4 * WSIZE){
+		//why check 
+	}
+}
 
 
 /*
@@ -174,7 +195,7 @@ static void* coalesce(void* p){
     size_t totalSize = READ_SIZE(getHeader(p)); 
 
 
-    //case 1: allocated | just freed | allocated , so coalesce is possible
+    //case 1: allocated | just freed | allocated , so coalesce is impossible
     if(prev_alloc_flag && next_alloc_flag){
       return p;
     }
@@ -183,8 +204,8 @@ static void* coalesce(void* p){
       removeFreeBlock(p);
       removeFreeBlock(next_block(p));
       totalSize += READ_SIZE(getHeader(next_block(p))); //read the size of the next block (free)
-      WRITE(getHeader(p), blockInfo(size, 0)); //write the header field of this block and mark it free
-      WRITE(getFooter(p), blockInfo(size, 0)); //similar to up there
+      WRITE(getHeader(p), blockInfo(totalSize, 0)); //write the header field of this block and mark it free
+      WRITE(getFooter(p), blockInfo(totalSize, 0)); //similar to up there
     }
     //case 3: free | just freed | allocated, so coalesce with the previous block and then move the pointer to
     //the previous block address
@@ -286,14 +307,40 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
-    int newsize = ALIGN(size + SIZE_T_SIZE);
-    void *p = mem_sbrk(newsize);
-    if (p == (void *)-1)
-	return NULL;
-    else {
-        *(size_t *)p = size;
-        return (void *)((char *)p + SIZE_T_SIZE);
+    size_t finalSize;
+    size_t heapExtend;
+
+    char* tempPtr;
+    char* result;
+
+    //edge case
+    if(size == 0){
+    	return NULL;
     }
+
+    //adjust the size to fit the paddling and alignment, bc the min-block size is 4 * WSIZE
+   	if(size < DSIZE){
+   		finalSize = DSIZE << 1;
+   	}
+   	else{
+   		finalSize = DSIZE * ((size + DSIZE + (DSIZE - 1)) / DSIZE); //????????????????????? ask peter
+   	}
+ 
+ 	//try to find a spot to fit the block
+ 	tempPtr = findFit(finalSize);
+   	if(tempPtr != NULL){ //different from peter
+   		result = place(tempPtr, finalSize);
+   		return result;
+   	}
+   	else{
+   		heapExtend = MAX(finalSize, CHUNKSIZE);
+   		tempPtr = extendHeap(heapExtend / WSIZE);
+   		if(tempPtr == NULL){
+   			return NULL;
+   		}
+   		result = place(tempPtr, finalSize);
+   		return result; 
+   	}
 }
 
 /*
@@ -301,6 +348,14 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *ptr)
 {
+	size_t size = READ_SIZE(getHeader(ptr));
+
+	//mark the free bit
+	WRITE(getHeader(ptr), blockInfo(size, 0));
+	WRITE(getFooter(ptr), blockInfo(size, 0));
+	insertFreeBlock(ptr, size);
+
+	coalesce(ptr);
 }
 
 /*
