@@ -110,7 +110,7 @@ static char *heapListPtr = 0;
 static void* coalesce(void *p); //finished Tony
 static void* extendHeap(size_t words);  //finished Tony
 static void* findFit(size_t sizeNeeded); // finished Tony
-static void* place(void *p, size_t size); //working Tony 
+static void* place(void *p, size_t size); //finished Tony 
 static void  insertFreeBlock(void *p, size_t blockSize);
 static void  removeFreeBlock(void *p);
 static int mm_check(void); //basically a debugger, wont call during the acutal submission, for style points
@@ -124,16 +124,44 @@ static void* place(void* p, size_t size){
 
 	size_t blockSize = READ_SIZE(getHeader(p));
 	void* nextPtr = NULL; //late will use 
-
+	int sizeDiff; 
 	//break the current block pointed by p from the segregated list
 	removeFreeBlock(p);
 
 
-	//if the difference between block size and payload size is bigger than the min-blocl size
+	//if the difference between block size and payload size is bigger than the min-block size => 2 * DSIZE
 	//then coalecse
-	if(blockSize - size >= 4 * WSIZE){
-		//why check 
+	sizeDiff = blockSize - size;
+	if(sizeDiff >= DSIZE << 2){
+		if((sizeDiff >= 200)){ //200 is subject to change
+			//we will store the payload at the end and have the beginning as free block
+			nextPtr = next_block(p);
+			//write the payload data
+			WRITE(getHeader(nextPtr), blockInfo(size, 1));
+			WRITE(getFooter(nextPtr), blockInfo(size, 1));
+			//prepare the free space
+			WRITE(getHeader(p), blockInfo(sizeDiff, 0));
+			WRITE(getFooter(p), blockInfo(sizeDiff, 0));
+
+			//insert the free leftover into the seglist
+			insertFreeBlock(p, sizeDiff);
+		}
+		else{
+			nextPtr = next_block(p);
+			WRITE(getHeader(nextPtr), blockInfo(size, 0));
+			WRITE(getFooter(nextPtr), blockInfo(size, 0));
+			WRITE(getHeader(p), blockInfo(sizeDiff, 1));
+			WRITE(getFooter(p), blockInfo(sizeDiff, 1));
+			insertFreeBlockI(nextPtr, sizeDiff);
+		} 
 	}
+	//the left over free space is way too small
+	else{
+		WRITE(getHeader(p), blockInfo(size, 1));
+		WRITE(getFooter(p), blockInfo(size, 1));
+	}
+
+	return p;
 }
 
 
@@ -319,11 +347,12 @@ void *mm_malloc(size_t size)
     }
 
     //adjust the size to fit the paddling and alignment, bc the min-block size is 4 * WSIZE
-   	if(size < DSIZE){
+   	if(size <= DSIZE){
    		finalSize = DSIZE << 1;
    	}
    	else{
-   		finalSize = DSIZE * ((size + DSIZE + (DSIZE - 1)) / DSIZE); //????????????????????? ask peter
+   		finalSize = DSIZE * (size + (DSIZE - 1)) / DSIZE; //alignment the payload for DSIZE alignment
+   		finalSize += DSIZE; //need another DSIZE for header and footer
    	}
  
  	//try to find a spot to fit the block
@@ -379,6 +408,43 @@ void *mm_realloc(void *ptr, size_t size)
 }
 
 
+
+
+/*
+ * mm_check: checks heap consistency. 0 => normal, -1 => error
+ */
+
+static int mm_check(void){
+	int errorCode = 0; 
+	int listIndex;
+	void* blockPtr = NULL;
+	void* nextPtr = NULL;
+	void* tempPtr = NULL;
+
+	//traverse the entire seg list
+	for(listIndex = 0; listIndex < LISTCOUNT; listIndex++){
+		blockPtr = seg_getIndex(segregatedListPtr, listIndex);
+		//check if every block is marked free
+		while(blockPtr != NULL){
+			if(READ_ALLOC(getHeader(blockPtr))){
+				//different from peter, didnot use getheader
+				print("block is not marked as free");
+				errorCode = -1;
+			}
+			blockPtr = seg_prevBlock(blockPtr);
+		}
+	}
+
+	//traverse the entire heap
+	blockPtr = heapListPtr;
+	nextPtr = NULL;
+
+	while(READ_ALLOC(getheader(blockPtr)) != 1 && READ_SIZE(getheader(blockPtr)) != 1){
+		nextPtr = next
+	}
+
+
+}
 
 
 
