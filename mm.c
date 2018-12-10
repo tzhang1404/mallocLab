@@ -440,7 +440,54 @@ static int mm_check(void){
 	nextPtr = NULL;
 
 	while(READ_ALLOC(getheader(blockPtr)) != 1 && READ_SIZE(getheader(blockPtr)) != 1){
-		nextPtr = next
+
+		nextPtr = next_block(blockPtr);
+
+		//check alignment, if the blockPtr is not 8-byte aligned, retun -1;
+		if((unsigned int)blockPtr % DSIZE){
+			errorCode = -1;
+			print("block is not 8-byte aligned");
+		}
+
+		//check the footer and header matches
+		if(READ_SIZE(getFooter(blockPtr)) != READ_SIZE(getHeader(blockPtr))){
+			print("header size and footer size dont match");
+			errorCode = -1;
+		}
+
+		if(READ_ALLOC(getFooter(blockPtr)) != READ_SIZE(getheader(blockPtr))){
+			print("allocation flag of header and footer dont match");
+		}
+
+
+		//check if two free blocks are together (not coalesced)
+		if(! (READ_ALLOC(getheader(blockPtr)) || READ_ALLOC(getheader(nextPtr)))){
+			errorCode = -1;
+			print("two free blocks are not coalesced");
+		}
+
+		//check if every free block is in the segList
+		if(!READ_ALLOC(getheader(blockPtr))){
+			int listIndex;
+			//iterate the sizes seglist
+			for(listIndex = 0; listIndex < LISTCOUNT; listIndex++){
+				tempPtr = seg_getIndex(segregatedListPtr, listIndex);
+				//now iterate all free blocks in this list
+				while(tempPtr != NULL){
+					if(tempPtr == blockPtr){
+						break; //good its in the list
+					}
+					tempPtr = seg_prevBlock(tempPtr);
+				}
+			}
+
+			if(tempPtr != blockPtr){
+				errorCode = -1;
+				print("free block not in segList");
+			}
+		}
+
+		blockPtr = seg_prevBlock(blockPtr);
 	}
 
 
