@@ -53,7 +53,7 @@ team_t team = {
 #define MIN(x, y) ((x) > (y) ? (y) : (x))
 #define blockInfo(size, alloc) ((size) | (alloc)) //put the size and allocated bit into a word
 
-//read and write at the address
+//read and WRITE at the address
 #define READ(p) (*(unsigned int *)(p))
 #define WRITE(p, val) (*(unsigned int *)(p) = val)
 
@@ -121,7 +121,6 @@ static int mm_check(void); //basically a debugger, wont call during the acutal s
  */
 
 static void* place(void* p, size_t size){
-
 	size_t blockSize = READ_SIZE(getHeader(p));
 	void* nextPtr = NULL; //late will use
 	int sizeDiff;
@@ -136,7 +135,7 @@ static void* place(void* p, size_t size){
 		if((sizeDiff >= 200)){ //200 is subject to change
 			//we will store the payload at the end and have the beginning as free block
 			nextPtr = next_block(p);
-			//write the payload data
+			//WRITE the payload data
 			WRITE(getHeader(nextPtr), blockInfo(size, 1));
 			WRITE(getFooter(nextPtr), blockInfo(size, 1));
 			//prepare the free space
@@ -223,7 +222,7 @@ static void* coalesce(void* p){
       removeFreeBlock(p);
       removeFreeBlock(next_block(p));
       totalSize += READ_SIZE(getHeader(next_block(p))); //read the size of the next block (free)
-      WRITE(getHeader(p), blockInfo(totalSize, 0)); //write the header field of this block and mark it free
+      WRITE(getHeader(p), blockInfo(totalSize, 0)); //WRITE the header field of this block and mark it free
       WRITE(getFooter(p), blockInfo(totalSize, 0)); //similar to up there
     }
     //case 3: free | just freed | allocated, so coalesce with the previous block and then move the pointer to
@@ -243,8 +242,8 @@ static void* coalesce(void* p){
     	removeFreeBlock(p);
     	removeFreeBlock(next_block(p));
     	totalSize += READ_SIZE(getHeader(prev_block(p))) + READ_SIZE(getHeader(next_block(p)));
-    	WRITE(getFooter(next_block(p)), blockInfo(totalSize, 0)); //write the footer at the next free block
-    	WRITE(getHeader(prev_block(p)), blockInfo(totalSize, 0)); //write the header at the prev free block
+    	WRITE(getFooter(next_block(p)), blockInfo(totalSize, 0)); //WRITE the footer at the next free block
+    	WRITE(getHeader(prev_block(p)), blockInfo(totalSize, 0)); //WRITE the header at the prev free block
 
     	p = prev_block(p);
     }
@@ -584,10 +583,10 @@ void *mm_realloc(void *ptr, size_t size)
 	//ajust the size for alignment
 	alignedSize = ALIGN(size);
 
-	//CASE ZERO, the new allocation size = old size, so just return oldPtr and write over it
+	//CASE ZERO, the new allocation size = old size, so just return oldPtr and WRITE over it
 	if(oldSize - DSIZE == alignedSize){
 		newPtr = oldPtr;
-		return newPtr; //just write over it since the size requirement is identical
+		return newPtr; //just WRITE over it since the size requirement is identical
 	}
 
 
@@ -595,7 +594,7 @@ void *mm_realloc(void *ptr, size_t size)
 
 
 	/* CASE ONE
-	 * When newSize < Oldsize, so overwrite and free the blocks after it
+	 * When newSize < Oldsize, so overWRITE and free the blocks after it
 	 */
 
 	if(alignedSize < oldSize){
@@ -629,21 +628,21 @@ void *mm_realloc(void *ptr, size_t size)
       removeFreeBlock(nextPtr);
     }
     if(nextSize + oldSize - DSIZE - alignedSize <= DSIZE) {
-      write(getHeader(oldPtr), blockInfo(alignedSize + DSIZE, 1));
-      write(getFooter(oldPtr), blockInfo(alignedSize + DSIZE), 1);
+      WRITE(getHeader(oldPtr), blockInfo(alignedSize + DSIZE, 1));
+      WRITE(getFooter(oldPtr), blockInfo(alignedSize + DSIZE), 1);
       newPtr = oldPtr;
       oldPtr = nextBlock(newPtr);
-      write(getHeader(oldPtr), write(oldSize + newSize, 1));
-      write(getFooter(oldPtr), write(oldSize + newSize, 1));
+      WRITE(getHeader(oldPtr), WRITE(oldSize + newSize, 1));
+      WRITE(getFooter(oldPtr), WRITE(oldSize + newSize, 1));
       return oldPtr;
     }
     else {
-      write(getHeader(oldPtr), write(alignedSize + DSIZE, 1));
-      write(getFooter(oldPtr), write(alignedSize + DSIZE, 1));
+      WRITE(getHeader(oldPtr), WRITE(alignedSize + DSIZE, 1));
+      WRITE(getFooter(oldPtr), WRITE(alignedSize + DSIZE, 1));
       newPtr = oldPtr;
       oldPtr = nextBlock(newPtr);
-      write(getHeader(oldPtr), blockInfo(oldSize - DSIZE - alignedSize - alignedSize + newSize, 0));
-      write(getFooter(oldPtr), blockInfo(oldSize - DSIZE - alignedSize - alignedSize + newSize, 0));
+      WRITE(getHeader(oldPtr), blockInfo(oldSize - DSIZE - alignedSize - alignedSize + newSize, 0));
+      WRITE(getFooter(oldPtr), blockInfo(oldSize - DSIZE - alignedSize - alignedSize + newSize, 0));
       insertFreeBlock(oldPtr, READ_SIZE(getHeader(oldPtr)));
       coalecse(oldPtr);
       return newPtr;
