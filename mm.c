@@ -408,7 +408,7 @@ static int mm_check(void){
 	blockPtr = heapListPtr;
 	nextPtr = NULL;
 
-	while(READ_ALLOC(getheader(blockPtr)) != 1 && READ_SIZE(getheader(blockPtr)) != 1){
+	while(READ_ALLOC(getHeader(blockPtr)) != 1 && READ_SIZE(getHeader(blockPtr)) != 1){
 
 		nextPtr = next_block(blockPtr);
 
@@ -424,19 +424,19 @@ static int mm_check(void){
 			errorCode = -1;
 		}
 
-		if(READ_ALLOC(getFooter(blockPtr)) != READ_SIZE(getheader(blockPtr))){
+		if(READ_ALLOC(getFooter(blockPtr)) != READ_SIZE(getHeader(blockPtr))){
 			print("allocation flag of header and footer dont match");
 		}
 
 
 		//check if two free blocks are together (not coalesced)
-		if(! (READ_ALLOC(getheader(blockPtr)) || READ_ALLOC(getheader(nextPtr)))){
+		if(! (READ_ALLOC(getHeader(blockPtr)) || READ_ALLOC(getHeader(nextPtr)))){
 			errorCode = -1;
 			print("two free blocks are not coalesced");
 		}
 
 		//check if every free block is in the segList
-		if(!READ_ALLOC(getheader(blockPtr))){
+		if(!READ_ALLOC(getHeader(blockPtr))){
 			int listIndex;
 			//iterate the sizes seglist
 			for(listIndex = 0; listIndex < LISTCOUNT; listIndex++){
@@ -564,7 +564,7 @@ void *mm_realloc(void *ptr, size_t size)
 	void* newPtr;
 	void* nextPtr;
 	size_t alignedSize, nextSize;
-	size_t oldSize = READ_SIZE(getheader(oldPtr));
+	size_t oldSize = READ_SIZE(getHeader(oldPtr));
 
 	//check edge cases
 	//check if the oldPtr is null, if so just allocate size from scratch
@@ -605,16 +605,16 @@ void *mm_realloc(void *ptr, size_t size)
 		}
 
 		//now allocate the smaller space for new size
-		WRITE(getheader(oldPtr), blockInfo(alignedSize + DSIZE, 1));
+		WRITE(getHeader(oldPtr), blockInfo(alignedSize + DSIZE, 1));
 		WRITE(getFooter(oldPtr), blockInfo(alignedSize + DSIZE, 1));
 
 		//swap the pointers so the newPtr can use this array
 		newPtr = oldPtr;
 		oldPtr = next_block(newPtr);
 		//clear the space of behind the payload
-		WRITE(getheader(oldPtr), blockInfo(oldSize - DSIZE - alignedSize, 0));
+		WRITE(getHeader(oldPtr), blockInfo(oldSize - DSIZE - alignedSize, 0));
 		WRITE(getFooter(oldPtr), blockInfo(oldSize - DSIZE - alignedSize, 0));
-		insertFreeBlock(oldPtr, READ_SIZE(getheader(oldPtr)));
+		insertFreeBlock(oldPtr, READ_SIZE(getHeader(oldPtr)));
 		coalesce(oldPtr);
 		return newPtr;
 	}
