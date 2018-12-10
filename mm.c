@@ -45,10 +45,10 @@ team_t team = {
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
 //newly defined macros
-#define WSIZE = 4 //word and header/footer size
-#define DSIZE = 8 //double size
+#define WSIZE 4 //word and header/footer size
+#define DSIZE 8 //double size
 #define CHUNKSIZE (1<<6)
-#define LISTCOUNT = 20
+#define LISTCOUNT 20
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define MIN(x, y) ((x) > (y) ? (y) : (x))
 #define blockInfo(size, alloc) ((size) | (alloc)) //put the size and allocated bit into a word
@@ -95,10 +95,10 @@ static char *heapListPtr = 0;
 #define nextField(p) ((char *)(p) + WSIZE)
 
 //get the actual address of the prev block in the seglist
-#define seg_prevBlock(p) (*(char **)p)
+#define seg_prev_block(p) (*(char **)p)
 
 //get the actual address of the next block in the seglist
-#define seg_nextBlock(p) (*(char **)(nextField(p)))
+#define seg_next_block(p) (*(char **)(nextField(p)))
 
 
 //get the pointer at the index of the seglist
@@ -172,7 +172,7 @@ static void* place(void* p, size_t size){
 static void* findFit(size_t sizeNeeded){
 	size_t size = sizeNeeded;
 	int listIndex = 0;
-	void* listPtr = null;
+	void* listPtr = NULL;
 
 	while(listIndex < LISTCOUNT){
 		if(listIndex == LISTCOUNT - 1 || (size <= 1 && (seg_getIndex(segregatedListPtr, listIndex) != NULL)))
@@ -181,9 +181,9 @@ static void* findFit(size_t sizeNeeded){
 
 			//we are at a specific sized list, now we traverse the list
 			while((listPtr != NULL) && (sizeNeeded > READ_SIZE(getHeader(listPtr)))){
-				listPtr = seg_prevBlock(listPtr);
+				listPtr = seg_prev_block(listPtr);
 				//techinically going down the list, but because of the way the memory is structured,
-				//we call prevBlock.
+				//we call prev_block.
 			}
 
 			//found the location
@@ -278,7 +278,7 @@ static void* extendHeap(size_t words){
     //initialize the free block header/footer and the epilogue header
     WRITE(getHeader(blockPtr), blockInfo(size, 0)); //free block header
     WRITE(getFooter(blockPtr), blockInfo(size, 0)); //free block footer
-    WRITE(getHeader(next_block(blockInfo)), blockInfo(0, 1));
+    WRITE(getHeader(next_block(blockPtr)), blockInfo(0, 1));
     insertFreeBlock(blockPtr, size);
 
     return coalesce(blockPtr); //coalesce just in case the last block is a free block
@@ -295,7 +295,7 @@ static void removeFreeBlock(void* p){
 
   /* Case 1: p is the head of the seglist, so we have to find the index of the seglist
   corresponding to blocks of bytes = size(p) */
-  if(seg_nextBlock(p) == NULL){
+  if(seg_next_block(p) == NULL){
     /* we know seglist indexes are ordered as: 1, 2, 4, 8, ..., so we count how many
     right shifts it takes for us to get blockSize to 1 */
     for(blockSize = READ_SIZE(getHeader(p)); blockSize > 1; blockSize >> 1){
@@ -305,7 +305,7 @@ static void removeFreeBlock(void* p){
       listIndex++;
     }
     // make seglist start at next block
-    seg_getIndex(segregatedListPtr, listIndex) = seg_prevBlock(p);
+    seg_getIndex(segregatedListPtr, listIndex) = seg_prev_block(p);
     if(seg_getIndex(segregatedListPtr, listIndex) != NULL){
       /* set address of block next to block we want to remove to be null, so that it doesn't
       point to the block we want to remove (and finishes removing block) */
@@ -340,7 +340,7 @@ static void removeFreeBlock(void* p){
 
   pointerToList = seg_getIndex(segregatedListPtr, listIndex);
   /* find location to insert, making sure list is sorted by block size */
-  for(pointerToList; blockSize <= READ_SIZE(getHeader(pointerToList)); pointerToList = seg_prevBlock(listIndex)){
+  for(pointerToList; blockSize <= READ_SIZE(getHeader(pointerToList)); pointerToList = seg_prev_block(listIndex)){
     if(pointerToList == NULL){
       break;
     }
@@ -351,28 +351,28 @@ static void removeFreeBlock(void* p){
   if(!pointerToList) {
     if(!locationToInsert) {
       seg_getIndex(segregatedListPtr, listIndex) = p;
-      insert_ptr(prevBlock(p), NULL);
-      insert_ptr(nextBlock(p), NULL);
+      insert_ptr(prev_block(p), NULL);
+      insert_ptr(next_block(p), NULL);
       return;
     }
     else {
-      insert_ptr(nextBlock(p), locationToInsert);
-      insert_ptr(prevBlock(locationToInsert), p);
-      insert_ptr(prevBlock(p), NULL);
+      insert_ptr(next_block(p), locationToInsert);
+      insert_ptr(prev_block(locationToInsert), p);
+      insert_ptr(prev_block(p), NULL);
     }
   }
   else {
     if(!locationToInsert){
-      insert_ptr(nextBlock(pointerToList), p);
-      insert_ptr(prevBlock(p), pointerToList);
-      insert_ptr(nextBlock(p), NULL);
+      insert_ptr(next_block(pointerToList), p);
+      insert_ptr(prev_block(p), pointerToList);
+      insert_ptr(next_block(p), NULL);
       seg_getIndex(segregatedListPtr, listIndex) = p;
     }
     else {
-      insert_ptr(prevBlock(locationToInsert), p);
-      insert_ptr(nextBlock(p), locationToInsert);
-      insert_ptr(prevBlock(p), pointerToList);
-      insert_ptr(nextBlock(pointerToList), p);
+      insert_ptr(prev_block(locationToInsert), p);
+      insert_ptr(next_block(p), locationToInsert);
+      insert_ptr(prev_block(p), pointerToList);
+      insert_ptr(next_block(pointerToList), p);
     }
   }
   return;
@@ -400,7 +400,7 @@ static int mm_check(void){
 				print("block is not marked as free");
 				errorCode = -1;
 			}
-			blockPtr = seg_prevBlock(blockPtr);
+			blockPtr = seg_prev_block(blockPtr);
 		}
 	}
 
@@ -446,7 +446,7 @@ static int mm_check(void){
 					if(tempPtr == blockPtr){
 						break; //good its in the list
 					}
-					tempPtr = seg_prevBlock(tempPtr);
+					tempPtr = seg_prev_block(tempPtr);
 				}
 			}
 
@@ -456,7 +456,7 @@ static int mm_check(void){
 			}
 		}
 
-		blockPtr = seg_prevBlock(blockPtr);
+		blockPtr = seg_prev_block(blockPtr);
 	}
 
 
@@ -612,8 +612,8 @@ void *mm_realloc(void *ptr, size_t size)
 		newPtr = oldPtr;
 		oldPtr = next_block(newPtr);
 		//clear the space of behind the payload
-		WRITE(getheader(oldPtr, blockInfo(oldSize - DSIZE - alignedSize, 0)));
-		WRITE(getFooter(oldPtr, blockInfo(oldSize - DSIZE - alignedSize, 0)));
+		WRITE(getheader(oldPtr), blockInfo(oldSize - DSIZE - alignedSize, 0));
+		WRITE(getFooter(oldPtr), blockInfo(oldSize - DSIZE - alignedSize, 0));
 		insertFreeBlock(oldPtr, READ_SIZE(getheader(oldPtr)));
 		coalesce(oldPtr);
 		return newPtr;
@@ -621,7 +621,7 @@ void *mm_realloc(void *ptr, size_t size)
 
   /* Case 2: when newSize > oldSize, we have two scenarios: we must find a new block
   or takes space of the next block */
-  nextPtr = nextBlock(oldPtr);
+  nextPtr = next_block(oldPtr);
   if(nextPtr != NULL && !READ_ALLOC(getHeader(nextPtr))){
     nextSize = READ_SIZE(getHeader(nextPtr));
     if(nextSize + oldPtr - DSIZE >= alignedSize){
@@ -629,20 +629,20 @@ void *mm_realloc(void *ptr, size_t size)
     }
     if(nextSize + oldSize - DSIZE - alignedSize <= DSIZE) {
       WRITE(getHeader(oldPtr), blockInfo(alignedSize + DSIZE, 1));
-      WRITE(getFooter(oldPtr), blockInfo(alignedSize + DSIZE), 1);
+      WRITE(getFooter(oldPtr), blockInfo(alignedSize + DSIZE, 1));
       newPtr = oldPtr;
-      oldPtr = nextBlock(newPtr);
-      WRITE(getHeader(oldPtr), WRITE(oldSize + newSize, 1));
-      WRITE(getFooter(oldPtr), WRITE(oldSize + newSize, 1));
+      oldPtr = next_block(newPtr);
+      WRITE(getHeader(oldPtr), WRITE(oldSize + nextSize, 1));
+      WRITE(getFooter(oldPtr), WRITE(oldSize + nextSize, 1));
       return oldPtr;
     }
     else {
       WRITE(getHeader(oldPtr), WRITE(alignedSize + DSIZE, 1));
       WRITE(getFooter(oldPtr), WRITE(alignedSize + DSIZE, 1));
       newPtr = oldPtr;
-      oldPtr = nextBlock(newPtr);
-      WRITE(getHeader(oldPtr), blockInfo(oldSize - DSIZE - alignedSize - alignedSize + newSize, 0));
-      WRITE(getFooter(oldPtr), blockInfo(oldSize - DSIZE - alignedSize - alignedSize + newSize, 0));
+      oldPtr = next_block(newPtr);
+      WRITE(getHeader(oldPtr), blockInfo(oldSize - DSIZE - alignedSize - alignedSize + nextSize, 0));
+      WRITE(getFooter(oldPtr), blockInfo(oldSize - DSIZE - alignedSize - alignedSize + nextSize, 0));
       insertFreeBlock(oldPtr, READ_SIZE(getHeader(oldPtr)));
       coalecse(oldPtr);
       return newPtr;
@@ -654,6 +654,6 @@ void *mm_realloc(void *ptr, size_t size)
   newPtr = mm_malloc(size);
   if(newPtr == NULL){ return NULL; }
   memcpy(newPtr, oldPtr, oldSize - DSIZE - alignedSize);
-  mm_free(oldptr);
+  mm_free(oldPtr);
   return newPtr;
 }
