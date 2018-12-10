@@ -291,7 +291,7 @@ static void* extendHeap(size_t words){
 
 static void removeFreeBlock(void* p){
   int listIndex = 0;
-  size_t blockSize;
+  size_t blockSize = READ_SIZE(getHeader(p));
 
   /* Case 1: p is the head of the seglist, so we have to find the index of the seglist
   corresponding to blocks of bytes = size(p) */
@@ -464,7 +464,7 @@ int mm_init(void)
 
 
   //initialize the list and set all blocks to null
-  for(listIndex = 0; listIndex < listIndex; listIndex++){
+  for(listIndex = 0; listIndex < LISTCOUNT; listIndex++){
     seg_getIndex(segregatedListPtr, listIndex);
   }
 
@@ -616,7 +616,7 @@ void *mm_realloc(void *ptr, size_t size)
   nextPtr = next_block(oldPtr);
   if(nextPtr != NULL && !READ_ALLOC(getHeader(nextPtr))){
     nextSize = READ_SIZE(getHeader(nextPtr));
-    if(nextSize + oldPtr - DSIZE >= alignedSize){
+    if(nextSize + oldSize - DSIZE >= alignedSize){
       removeFreeBlock(nextPtr);
     }
     if(nextSize + oldSize - DSIZE - alignedSize <= DSIZE) {
