@@ -334,9 +334,9 @@ static void removeFreeBlock(void* p){
 
   pointerToList = seg_getIndex(segregatedListPtr, listIndex);
   /* find location to insert, making sure list is sorted by block size */
-  while ((pointerToList != NULL) && (blockSize > GET_SIZE(HDRP(pointerToList)))) {
+  while ((pointerToList != NULL) && (blockSize > READ_SIZE(getHeader(pointerToList)))) {
     locationToInsert = pointerToList;
-    pointerToList = GET_PREV_BLK(pointerToList);
+    pointerToList = seg_prev_block(pointerToList);
   }
 
   /* There are four possible combinations as to where to insert the free block: */
