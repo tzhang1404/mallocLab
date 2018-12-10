@@ -50,12 +50,11 @@ team_t team = {
 #define CHUNKSIZE (1<<6)
 #define LISTCOUNT 20
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
-#define MIN(x, y) ((x) > (y) ? (y) : (x))
 #define blockInfo(size, alloc) ((size) | (alloc)) //put the size and allocated bit into a word
 
 //read and WRITE at the address
 #define READ(p) (*(unsigned int *)(p))
-#define WRITE(p, val) (*(unsigned int *)(p) = val)
+#define WRITE(p, val) (*(unsigned int *)(p) = (val))
 
 //read the size field at the address
 #define READ_SIZE(p) (READ(p) & ~0x7)
@@ -80,8 +79,8 @@ team_t team = {
 //prepare the segList Variables
 
 //global variables
-static void *segregatedListPtr;
-static char *heapListPtr = 0;
+static void* segregatedListPtr;
+static char* heapListPtr = 0;
 
 //set the prev and next field of p to address new pointer
 //HOW SO?????
@@ -102,7 +101,7 @@ static char *heapListPtr = 0;
 
 
 //get the pointer at the index of the seglist
-#define seg_getIndex(ptr, index)  (*((char **)ptr + index))
+#define seg_getIndex(ptr, index)  *((char **)ptr + index)
 
 
 
@@ -308,7 +307,7 @@ static void removeFreeBlock(void* p){
     if(seg_getIndex(segregatedListPtr, listIndex) != NULL){
       /* set address of block next to block we want to remove to be null, so that it doesn't
       point to the block we want to remove (and finishes removing block) */
-      insert_ptr(next_block(seg_getIndex(segregatedListPtr, listIndex)), NULL);
+      insert_ptr(nextField(seg_getIndex(segregatedListPtr, listIndex)), NULL);
     }
 
     mm_check();
@@ -316,17 +315,17 @@ static void removeFreeBlock(void* p){
   }
 
   /* Case 2: p is not the head of seglist, so just update prev/next block as typical linked list */
-  insert_ptr(prev_block(next_block(p)), prev_block(p));
+  insert_ptr(prevField(seg_next_block(p)), seg_prev_block(p));
   // check for next_block pointer since our block can be last in seglist
-  if(prev_block(p) != NULL){
-    insert_ptr(next_block(prev_block(p)), prev_block(p));
+  if(seg_prev_block(p) != NULL){
+    insert_ptr(nextField(seg_prev_block(p)), seg_next_block(p));
   }
 }
 
 //function signature needed
  static void insertFreeBlock(void *p, size_t blockSize) {
-   void *pointerToList = NULL;
-   void *locationToInsert = NULL;
+  void *pointerToList = NULL;
+  void *locationToInsert = NULL;
   int listIndex = 0;
 
   /* find list index of block we want to insert - same idea as with removeFreeBlock */
@@ -346,28 +345,28 @@ static void removeFreeBlock(void* p){
   if(!pointerToList) {
     if(!locationToInsert) {
       seg_getIndex(segregatedListPtr, listIndex) = p;
-      insert_ptr(prev_block(p), NULL);
-      insert_ptr(next_block(p), NULL);
+      insert_ptr(prevField(p), NULL);
+      insert_ptr(nextField(p), NULL);
       return;
     }
     else {
-      insert_ptr(next_block(p), locationToInsert);
-      insert_ptr(prev_block(locationToInsert), p);
-      insert_ptr(prev_block(p), NULL);
+      insert_ptr(nextField(p), locationToInsert);
+      insert_ptr(prevField(locationToInsert), p);
+      insert_ptr(prevField(p), NULL);
     }
   }
   else {
     if(!locationToInsert){
-      insert_ptr(next_block(pointerToList), p);
-      insert_ptr(prev_block(p), pointerToList);
-      insert_ptr(next_block(p), NULL);
+      insert_ptr(nextField(pointerToList), p);
+      insert_ptr(prevField(p), pointerToList);
+      insert_ptr(nextField(p), NULL);
       seg_getIndex(segregatedListPtr, listIndex) = p;
     }
     else {
-      insert_ptr(prev_block(locationToInsert), p);
-      insert_ptr(next_block(p), locationToInsert);
-      insert_ptr(prev_block(p), pointerToList);
-      insert_ptr(next_block(pointerToList), p);
+      insert_ptr(prevField(locationToInsert), p);
+      insert_ptr(nextField(p), locationToInsert);
+      insert_ptr(prevField(p), pointerToList);
+      insert_ptr(nextField(pointerToList), p);
     }
   }
 
@@ -464,6 +463,7 @@ static int mm_check(void){
  */
 int mm_init(void)
 {
+  
   int listIndex;
   segregatedListPtr = mem_sbrk(LISTCOUNT * WSIZE);
 
@@ -475,7 +475,7 @@ int mm_init(void)
 
   //create the heap
 
-  if((heapListPtr = mem_sbrk(4 * WSIZE)) == (void *) - 1){
+  if((heapListPtr = mem_sbrk(WSIZE << 2)) == (void *) - 1){
     return -1;
   }
 
@@ -518,12 +518,12 @@ void *mm_malloc(size_t size)
    		finalSize = DSIZE << 1;
    	}
    	else{
-   		finalSize = DSIZE * (size + (DSIZE - 1)) / DSIZE; //alignment the payload for DSIZE alignment
+   		finalSize = DSIZE * ((size + (DSIZE - 1)) / DSIZE); //alignment the payload for DSIZE alignment
    		finalSize += DSIZE; //need another DSIZE for header and footer
    	}
 
- 	//try to find a spot to fit the block
- 	tempPtr = findFit(finalSize);
+ 	  //try to find a spot to fit the block
+ 	  tempPtr = findFit(finalSize);
    	if(tempPtr != NULL){ //different from peter
    		result = place(tempPtr, finalSize);
 
@@ -542,7 +542,7 @@ void *mm_malloc(size_t size)
    		}
    		result = place(tempPtr, finalSize);
 
-        mm_check();
+      mm_check();
 
    		return result;
    	}
