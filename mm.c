@@ -159,7 +159,7 @@ static void* place(void* p, size_t size){
 		WRITE(getHeader(p), blockInfo(size, 1));
 		WRITE(getFooter(p), blockInfo(size, 1));
 	}
-
+  mm_check();
 	return p;
 }
 
@@ -195,7 +195,7 @@ static void* findFit(size_t sizeNeeded){
 		size = size >> 1; //track size and if it fits
 
 	}
-
+  mm_check();
 	return listPtr;
 
 }
@@ -249,7 +249,7 @@ static void* coalesce(void* p){
     }
     //put the block pointer back into the free seg list
     insertFreeBlock(p, totalSize);
-
+    mm_check();
     return p;
 
 }
@@ -281,6 +281,7 @@ static void* extendHeap(size_t words){
     WRITE(getHeader(next_block(blockPtr)), blockInfo(0, 1));
     insertFreeBlock(blockPtr, size);
 
+    mm_check();
     return coalesce(blockPtr); //coalesce just in case the last block is a free block
 }
 
@@ -309,6 +310,8 @@ static void removeFreeBlock(void* p){
       point to the block we want to remove (and finishes removing block) */
       insert_ptr(next_block(seg_getIndex(segregatedListPtr, listIndex)), NULL);
     }
+
+    mm_check();
     return;
   }
 
@@ -367,6 +370,8 @@ static void removeFreeBlock(void* p){
       insert_ptr(next_block(pointerToList), p);
     }
   }
+
+  mm_check();
   return;
  }
 
@@ -485,6 +490,8 @@ int mm_init(void)
     return -1;
   }
 
+
+  mm_check();
   return 0;
 
 }
@@ -519,15 +526,24 @@ void *mm_malloc(size_t size)
  	tempPtr = findFit(finalSize);
    	if(tempPtr != NULL){ //different from peter
    		result = place(tempPtr, finalSize);
+
+      mm_check();
+
    		return result;
    	}
    	else{
    		heapExtend = MAX(finalSize, CHUNKSIZE);
    		tempPtr = extendHeap(heapExtend / WSIZE);
    		if(tempPtr == NULL){
+
+        mm_check();
+
    			return NULL;
    		}
    		result = place(tempPtr, finalSize);
+
+        mm_check();
+
    		return result;
    	}
 }
@@ -545,6 +561,8 @@ void mm_free(void *ptr)
 	insertFreeBlock(ptr, size);
 
 	coalesce(ptr);
+
+  mm_check();
 }
 
 /*
@@ -593,6 +611,8 @@ void *mm_realloc(void *ptr, size_t size)
 		//check the remaining size
 		if(oldSize - alignedSize < DSIZE << 2){
 			//too small to even be the smallest size block so just return the oldPtr
+      mm_check();
+
 			return oldPtr;
 		}
 
@@ -608,6 +628,8 @@ void *mm_realloc(void *ptr, size_t size)
 		WRITE(getFooter(oldPtr), blockInfo(oldSize - DSIZE - alignedSize, 0));
 		insertFreeBlock(oldPtr, READ_SIZE(getHeader(oldPtr)));
 		coalesce(oldPtr);
+
+    mm_check();
 		return newPtr;
 	}
 
@@ -626,6 +648,8 @@ void *mm_realloc(void *ptr, size_t size)
       oldPtr = next_block(newPtr);
       WRITE(getHeader(oldPtr), WRITE(oldSize + nextSize, 1));
       WRITE(getFooter(oldPtr), WRITE(oldSize + nextSize, 1));
+
+      mm_check();
       return oldPtr;
     }
     else {
@@ -637,6 +661,10 @@ void *mm_realloc(void *ptr, size_t size)
       WRITE(getFooter(oldPtr), blockInfo(oldSize - DSIZE - alignedSize - alignedSize + nextSize, 0));
       insertFreeBlock(oldPtr, READ_SIZE(getHeader(oldPtr)));
       coalesce(oldPtr);
+
+
+
+      mm_check();
       return newPtr;
     }
   }
@@ -647,5 +675,8 @@ void *mm_realloc(void *ptr, size_t size)
   if(newPtr == NULL){ return NULL; }
   memcpy(newPtr, oldPtr, oldSize - DSIZE - alignedSize);
   mm_free(oldPtr);
+
+
+  mm_check();
   return newPtr;
 }
