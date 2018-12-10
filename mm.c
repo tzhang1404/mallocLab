@@ -1,6 +1,6 @@
 /*
  * mm-naive.c - The fastest, least memory-efficient malloc package.
- * 
+ *
  * In this naive approach, a block is allocated by simply incrementing
  * the brk pointer.  A block is pure payload. There are no headers or
  * footers.  Blocks are never coalesced or reused. Realloc is
@@ -70,7 +70,7 @@ team_t team = {
 //get the next block
 #define next_block(p) ((char *)(p) + READ_SIZE(((char *)(p) - WSIZE)))
 
-//get the previous block 
+//get the previous block
 #define prev_block(p) ((char *)(p) - READ_SIZE(((char *)(p) - DSIZE)))
 
 
@@ -81,7 +81,7 @@ team_t team = {
 
 //global variables
 static void *segregatedListPtr;
-static char *heapListPtr = 0; 
+static char *heapListPtr = 0;
 
 //set the prev and next field of p to address new pointer
 //HOW SO?????
@@ -101,7 +101,7 @@ static char *heapListPtr = 0;
 #define seg_nextBlock(p) (*(char **)(nextField(p)))
 
 
-//get the pointer at the index of the seglist 
+//get the pointer at the index of the seglist
 #define seg_getIndex(ptr, index)  (*((char **)ptr + index))
 
 
@@ -110,7 +110,7 @@ static char *heapListPtr = 0;
 static void* coalesce(void *p); //finished Tony
 static void* extendHeap(size_t words);  //finished Tony
 static void* findFit(size_t sizeNeeded); // finished Tony
-static void* place(void *p, size_t size); //finished Tony 
+static void* place(void *p, size_t size); //finished Tony
 static void  insertFreeBlock(void *p, size_t blockSize);
 static void  removeFreeBlock(void *p);
 static int mm_check(void); //basically a debugger, wont call during the acutal submission, for style points
@@ -123,8 +123,8 @@ static int mm_check(void); //basically a debugger, wont call during the acutal s
 static void* place(void* p, size_t size){
 
 	size_t blockSize = READ_SIZE(getHeader(p));
-	void* nextPtr = NULL; //late will use 
-	int sizeDiff; 
+	void* nextPtr = NULL; //late will use
+	int sizeDiff;
 	//break the current block pointed by p from the segregated list
 	removeFreeBlock(p);
 
@@ -153,7 +153,7 @@ static void* place(void* p, size_t size){
 			WRITE(getHeader(p), blockInfo(sizeDiff, 1));
 			WRITE(getFooter(p), blockInfo(sizeDiff, 1));
 			insertFreeBlock(nextPtr, sizeDiff);
-		} 
+		}
 	}
 	//the left over free space is way too small
 	else{
@@ -182,7 +182,7 @@ static void* findFit(size_t sizeNeeded){
 
 			//we are at a specific sized list, now we traverse the list
 			while((listPtr != NULL) && (sizeNeeded > READ_SIZE(getHeader(listPtr)))){
-				listPtr = seg_prevBlock(listPtr); 
+				listPtr = seg_prevBlock(listPtr);
 				//techinically going down the list, but because of the way the memory is structured,
 				//we call prevBlock.
 			}
@@ -199,7 +199,7 @@ static void* findFit(size_t sizeNeeded){
 
 	return listPtr;
 
-} 
+}
 
 
 /*
@@ -211,7 +211,7 @@ static void* coalesce(void* p){
     size_t prev_alloc_flag = READ_ALLOC(getHeader(prev_block(p)));
     size_t next_alloc_flag = READ_ALLOC(getHeader(next_block(p)));
 
-    size_t totalSize = READ_SIZE(getHeader(p)); 
+    size_t totalSize = READ_SIZE(getHeader(p));
 
 
     //case 1: allocated | just freed | allocated , so coalesce is impossible
@@ -233,7 +233,7 @@ static void* coalesce(void* p){
     	removeFreeBlock(prev_block(p));
     	totalSize += READ_SIZE(getHeader(prev_block(p)));
     	WRITE(getFooter(p), blockInfo(totalSize, 0)); //change the curr block's footer (size, free)
-    	WRITE(getHeader(prev_block(p)), blockInfo(totalSize, 0)); 
+    	WRITE(getHeader(prev_block(p)), blockInfo(totalSize, 0));
 
     	p = prev_block(p); //move the free block pointer to the previous block
     }
@@ -252,18 +252,18 @@ static void* coalesce(void* p){
     insertFreeBlock(p, totalSize);
 
     return p;
-    
+
 }
 
 
 /*
  * extendHeap: extend the heap hby requestin block of CHUNKSIZE byte
- */ 
+ */
 
 static void* extendHeap(size_t words){
     char* blockPtr;
 
-    size_t size; 
+    size_t size;
 
     //make sure the the size allocated is an even number
     if(words % 2 == 1){
@@ -385,7 +385,7 @@ static void removeFreeBlock(void* p){
  */
 
 static int mm_check(void){
-	int errorCode = 0; 
+	int errorCode = 0;
 	int listIndex;
 	void* blockPtr = NULL;
 	void* nextPtr = NULL;
@@ -463,7 +463,7 @@ static int mm_check(void){
 
 }
 
-/* 
+/*
  * mm_init - initialize the malloc package. Tony Finished
  */
 int mm_init(void)
@@ -498,7 +498,7 @@ int mm_init(void)
 
 }
 
-/* 
+/*
  * mm_malloc - Allocate a block by incrementing the brk pointer.
  *     Always allocate a block whose size is a multiple of the alignment.
  */
@@ -523,7 +523,7 @@ void *mm_malloc(size_t size)
    		finalSize = DSIZE * (size + (DSIZE - 1)) / DSIZE; //alignment the payload for DSIZE alignment
    		finalSize += DSIZE; //need another DSIZE for header and footer
    	}
- 
+
  	//try to find a spot to fit the block
  	tempPtr = findFit(finalSize);
    	if(tempPtr != NULL){ //different from peter
@@ -537,7 +537,7 @@ void *mm_malloc(size_t size)
    			return NULL;
    		}
    		result = place(tempPtr, finalSize);
-   		return result; 
+   		return result;
    	}
 }
 
@@ -594,7 +594,7 @@ void *mm_realloc(void *ptr, size_t size)
 	/* Three Cases Below for Realloc */
 
 
-	/* CASE ONE 
+	/* CASE ONE
 	 * When newSize < Oldsize, so overwrite and free the blocks after it
 	 */
 
@@ -602,7 +602,7 @@ void *mm_realloc(void *ptr, size_t size)
 		//check the remaining size
 		if(oldSize - alignedSize < DSIZE << 2){
 			//too small to even be the smallest size block so just return the oldPtr
-			return oldPtr; 
+			return oldPtr;
 		}
 
 		//now allocate the smaller space for new size
@@ -617,25 +617,44 @@ void *mm_realloc(void *ptr, size_t size)
 		WRITE(getFooter(oldPtr, blockInfo(oldSize - DSIZE - alignedSize, 0)));
 		insertFreeBlock(oldPtr, READ_SIZE(getheader(oldPtr)));
 		coalesce(oldPtr);
-		return newPtr; 
+		return newPtr;
 	}
 
+  /* Case 2: when newSize > oldSize, we have two scenarios: we must find a new block
+  or takes space of the next block */
+  nextPtr = nextBlock(oldPtr);
+  if(nextPtr != NULL && !READ_ALLOC(getHeader(nextPtr))){
+    nextSize = READ_SIZE(getHeader(nextPtr));
+    if(nextSize + oldPtr - DSIZE >= alignedSize){
+      removeFreeBlock(nextPtr);
+    }
+    if(nextSize + oldSize - DSIZE - alignedSize <= DSIZE) {
+      write(getHeader(oldPtr), blockInfo(alignedSize + DSIZE, 1));
+      write(getFooter(oldPtr), blockInfo(alignedSize + DSIZE), 1);
+      newPtr = oldPtr;
+      oldPtr = nextBlock(newPtr);
+      write(getHeader(oldPtr), write(oldSize + newSize, 1));
+      write(getFooter(oldPtr), write(oldSize + newSize, 1));
+      return oldPtr;
+    }
+    else {
+      write(getHeader(oldPtr), write(alignedSize + DSIZE, 1));
+      write(getFooter(oldPtr), write(alignedSize + DSIZE, 1));
+      newPtr = oldPtr;
+      oldPtr = nextBlock(newPtr);
+      write(getHeader(oldPtr), blockInfo(oldSize - DSIZE - alignedSize - alignedSize + newSize, 0));
+      write(getFooter(oldPtr), blockInfo(oldSize - DSIZE - alignedSize - alignedSize + newSize, 0));
+      insertFreeBlock(oldPtr, READ_SIZE(getHeader(oldPtr)));
+      coalecse(oldPtr);
+      return newPtr;
+    }
+  }
 
-
-
-
-
+  /* Case 3: We exahusted cases one and two so the only remaning option is to allocated
+  a completely new bock to fit the requested size */
+  newPtr = mm_malloc(size);
+  if(newPtr == NULL){ return NULL; }
+  memcpy(newPtr, oldPtr, oldSize - DSIZE - alignedSize);
+  mm_free(oldptr);
+  return newPtr;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
