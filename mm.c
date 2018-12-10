@@ -152,7 +152,7 @@ static void* place(void* p, size_t size){
 			WRITE(getFooter(nextPtr), blockInfo(size, 0));
 			WRITE(getHeader(p), blockInfo(sizeDiff, 1));
 			WRITE(getFooter(p), blockInfo(sizeDiff, 1));
-			insertFreeBlockI(nextPtr, sizeDiff);
+			insertFreeBlock(nextPtr, sizeDiff);
 		} 
 	}
 	//the left over free space is way too small
@@ -201,15 +201,6 @@ static void* findFit(size_t sizeNeeded){
 
 } 
 
-/*
- * removeFreeBlock: remove a free block from the seg_list and update its pre, next pointer
- */
-
-static void removeFreeBlock(void* p){
-  int listIndex = 0;
-
-
-}
 
 /*
  * coalesce: join the freed block with its previous and next ones
@@ -292,6 +283,184 @@ static void* extendHeap(size_t words){
     insertFreeBlock(blockPtr, size);
 
     return coalesce(blockPtr); //coalesce just in case the last block is a free block
+}
+
+
+/*
+ * removeFreeBlock: remove a free block from the seg_list and update its pre, next pointer
+ */
+
+static void removeFreeBlock(void* p){
+  int listIndex = 0;
+  size_t blockSize;
+
+  /* Case 1: p is the head of the seglist, so we have to find the index of the seglist
+  corresponding to blocks of bytes = size(p) */
+  if(seg_nextBlock(p) == NULL){
+    /* we know seglist indexes are ordered as: 1, 2, 4, 8, ..., so we count how many
+    right shifts it takes for us to get blockSize to 1 */
+    for(blockSize = READ_SIZE(getHeader(p)); blockSize > 1; blockSize >> 1){
+      if(listIndex >= (LISTCOUNT - 1)){
+        break;
+      }
+      listIndex++;
+    }
+    // make seglist start at next block
+    seg_getIndex(segregatedListPtr, listIndex) = seg_prevBlock(p);
+    if(seg_getIndex(segregatedListPtr, listIndex) != NULL){
+      /* set address of block next to block we want to remove to be null, so that it doesn't
+      point to the block we want to remove (and finishes removing block) */
+      insert_ptr(next_block(seg_getIndex(segregatedListPtr, listIndex)), NULL);
+    }
+    return;
+  }
+
+  /* Case 2: p is not the head of seglist, so just update prev/next block as typical linked list */
+  insert_ptr(prev_block(next_block(p)), prev_block(p));
+  // check for next_block pointer since our block can be last in seglist
+  if(prev_block(p) != NULL){
+    insert_ptr(next_block(prev_block(p)), prev_block(p));
+  }
+}
+
+/*
+ * removeFreeBlock: remove a free block from the seg_list and update its pre, next pointer
+ */
+ static void insertFreeBlock(void *p, size_t blockSize) {
+   void *pointerToList = NULL;
+   void *locationToInsert = NULL;
+  int listIndex = 0;
+
+  /* find list index of block we want to insert - same idea as with removeFreeBlock */
+  for(blockSize; blockSize > 1; blockSize >> 1){
+    if(listIndex >= (LISTCOUNT - 1)){
+      break;
+    }
+    listIndex++;
+  }
+
+  pointerToList = seg_getIndex(segregatedListPtr, listIndex);
+  /* find location to insert, making sure list is sorted by block size */
+  for(pointerToList; blockSize <= READ_SIZE(getHeader(pointerToList)); pointerToList = seg_prevBlock(listIndex)){
+    if(pointerToList == NULL){
+      break;
+    }
+    locationToInsert = pointerToList;
+  }
+
+  /* There are four possible combinations as to where to insert the free block: */
+  if(!pointerToList) {
+    if(!locationToInsert) {
+      seg_getIndex(segregatedListPtr, listIndex) = p;
+      insert_ptr(prevBlock(p), NULL);
+      insert_ptr(nextBlock(p), NULL);
+      return;
+    }
+    else {
+      insert_ptr(nextBlock(p), locationToInsert);
+      insert_ptr(prevBlock(locationToInsert), p);
+      insert_ptr(prevBlock(p), NULL);
+    }
+  }
+  else {
+    if(!locationToInsert){
+      insert_ptr(nextBlock(pointerToList), p);
+      insert_ptr(prevBlock(p), pointerToList);
+      insert_ptr(nextBlock(p), NULL);
+      seg_getIndex(segregatedListPtr, listIndex) = p;
+    }
+    else {
+      insert_ptr(prevBlock(locationToInsert), p);
+      insert_ptr(nextBlock(p), locationToInsert);
+      insert_ptr(prevBlock(p), pointerToList);
+      insert_ptr(nextBlock(pointerToList), p);
+    }
+  }
+  return;
+ }
+
+
+ /*
+ * mm_check: checks heap consistency. 0 => normal, -1 => error
+ */
+
+static int mm_check(void){
+	int errorCode = 0; 
+	int listIndex;
+	void* blockPtr = NULL;
+	void* nextPtr = NULL;
+	void* tempPtr = NULL;
+
+	//traverse the entire seg list
+	for(listIndex = 0; listIndex < LISTCOUNT; listIndex++){
+		blockPtr = seg_getIndex(segregatedListPtr, listIndex);
+		//check if every block is marked free
+		while(blockPtr != NULL){
+			if(READ_ALLOC(getHeader(blockPtr))){
+				//different from peter, didnot use getheader
+				print("block is not marked as free");
+				errorCode = -1;
+			}
+			blockPtr = seg_prevBlock(blockPtr);
+		}
+	}
+
+	//traverse the entire heap
+	blockPtr = heapListPtr;
+	nextPtr = NULL;
+
+	while(READ_ALLOC(getheader(blockPtr)) != 1 && READ_SIZE(getheader(blockPtr)) != 1){
+
+		nextPtr = next_block(blockPtr);
+
+		//check alignment, if the blockPtr is not 8-byte aligned, retun -1;
+		if((unsigned int)blockPtr % DSIZE){
+			errorCode = -1;
+			print("block is not 8-byte aligned");
+		}
+
+		//check the footer and header matches
+		if(READ_SIZE(getFooter(blockPtr)) != READ_SIZE(getHeader(blockPtr))){
+			print("header size and footer size dont match");
+			errorCode = -1;
+		}
+
+		if(READ_ALLOC(getFooter(blockPtr)) != READ_SIZE(getheader(blockPtr))){
+			print("allocation flag of header and footer dont match");
+		}
+
+
+		//check if two free blocks are together (not coalesced)
+		if(! (READ_ALLOC(getheader(blockPtr)) || READ_ALLOC(getheader(nextPtr)))){
+			errorCode = -1;
+			print("two free blocks are not coalesced");
+		}
+
+		//check if every free block is in the segList
+		if(!READ_ALLOC(getheader(blockPtr))){
+			int listIndex;
+			//iterate the sizes seglist
+			for(listIndex = 0; listIndex < LISTCOUNT; listIndex++){
+				tempPtr = seg_getIndex(segregatedListPtr, listIndex);
+				//now iterate all free blocks in this list
+				while(tempPtr != NULL){
+					if(tempPtr == blockPtr){
+						break; //good its in the list
+					}
+					tempPtr = seg_prevBlock(tempPtr);
+				}
+			}
+
+			if(tempPtr != blockPtr){
+				errorCode = -1;
+				print("free block not in segList");
+			}
+		}
+
+		blockPtr = seg_prevBlock(blockPtr);
+	}
+
+
 }
 
 /* 
@@ -392,106 +561,72 @@ void mm_free(void *ptr)
  */
 void *mm_realloc(void *ptr, size_t size)
 {
-    void *oldptr = ptr;
-    void *newptr;
-    size_t copySize;
-    
-    newptr = mm_malloc(size);
-    if (newptr == NULL)
-      return NULL;
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    if (size < copySize)
-      copySize = size;
-    memcpy(newptr, oldptr, copySize);
-    mm_free(oldptr);
-    return newptr;
-}
+	void* oldPtr = ptr;
+	void* newPtr;
+	void* nextPtr;
+	size_t alignedSize, nextSize;
+	size_t oldSize = READ_SIZE(getheader(oldPtr));
 
-
-
-
-/*
- * mm_check: checks heap consistency. 0 => normal, -1 => error
- */
-
-static int mm_check(void){
-	int errorCode = 0; 
-	int listIndex;
-	void* blockPtr = NULL;
-	void* nextPtr = NULL;
-	void* tempPtr = NULL;
-
-	//traverse the entire seg list
-	for(listIndex = 0; listIndex < LISTCOUNT; listIndex++){
-		blockPtr = seg_getIndex(segregatedListPtr, listIndex);
-		//check if every block is marked free
-		while(blockPtr != NULL){
-			if(READ_ALLOC(getHeader(blockPtr))){
-				//different from peter, didnot use getheader
-				print("block is not marked as free");
-				errorCode = -1;
-			}
-			blockPtr = seg_prevBlock(blockPtr);
-		}
+	//check edge cases
+	//check if the oldPtr is null, if so just allocate size from scratch
+	if(oldPtr == NULL){
+		newPtr = mm_malloc(size);
+		return newPtr;
 	}
 
-	//traverse the entire heap
-	blockPtr = heapListPtr;
-	nextPtr = NULL;
-
-	while(READ_ALLOC(getheader(blockPtr)) != 1 && READ_SIZE(getheader(blockPtr)) != 1){
-
-		nextPtr = next_block(blockPtr);
-
-		//check alignment, if the blockPtr is not 8-byte aligned, retun -1;
-		if((unsigned int)blockPtr % DSIZE){
-			errorCode = -1;
-			print("block is not 8-byte aligned");
-		}
-
-		//check the footer and header matches
-		if(READ_SIZE(getFooter(blockPtr)) != READ_SIZE(getHeader(blockPtr))){
-			print("header size and footer size dont match");
-			errorCode = -1;
-		}
-
-		if(READ_ALLOC(getFooter(blockPtr)) != READ_SIZE(getheader(blockPtr))){
-			print("allocation flag of header and footer dont match");
-		}
-
-
-		//check if two free blocks are together (not coalesced)
-		if(! (READ_ALLOC(getheader(blockPtr)) || READ_ALLOC(getheader(nextPtr)))){
-			errorCode = -1;
-			print("two free blocks are not coalesced");
-		}
-
-		//check if every free block is in the segList
-		if(!READ_ALLOC(getheader(blockPtr))){
-			int listIndex;
-			//iterate the sizes seglist
-			for(listIndex = 0; listIndex < LISTCOUNT; listIndex++){
-				tempPtr = seg_getIndex(segregatedListPtr, listIndex);
-				//now iterate all free blocks in this list
-				while(tempPtr != NULL){
-					if(tempPtr == blockPtr){
-						break; //good its in the list
-					}
-					tempPtr = seg_prevBlock(tempPtr);
-				}
-			}
-
-			if(tempPtr != blockPtr){
-				errorCode = -1;
-				print("free block not in segList");
-			}
-		}
-
-		blockPtr = seg_prevBlock(blockPtr);
+	//if the new size is 0, then free the old allocated space and return;
+	if(size == 0){
+		mm_free(oldPtr);
+		return NULL;
 	}
 
 
+	//ajust the size for alignment
+	alignedSize = ALIGN(size);
+
+	//CASE ZERO, the new allocation size = old size, so just return oldPtr and write over it
+	if(oldSize - DSIZE == alignedSize){
+		newPtr = oldPtr;
+		return newPtr; //just write over it since the size requirement is identical
+	}
+
+
+	/* Three Cases Below for Realloc */
+
+
+	/* CASE ONE 
+	 * When newSize < Oldsize, so overwrite and free the blocks after it
+	 */
+
+	if(alignedSize < oldSize){
+		//check the remaining size
+		if(oldSize - alignedSize < DSIZE << 2){
+			//too small to even be the smallest size block so just return the oldPtr
+			return oldPtr; 
+		}
+
+		//now allocate the smaller space for new size
+		WRITE(getheader(oldPtr), blockInfo(alignedSize + DSIZE, 1));
+		WRITE(getFooter(oldPtr), blockInfo(alignedSize + DSIZE, 1));
+
+		//swap the pointers so the newPtr can use this array
+		newPtr = oldPtr;
+		oldPtr = next_block(newPtr);
+		//clear the space of behind the payload
+		WRITE(getheader(oldPtr, blockInfo(oldSize - DSIZE - alignedSize, 0)));
+		WRITE(getFooter(oldPtr, blockInfo(oldSize - DSIZE - alignedSize, 0)));
+		insertFreeBlock(oldPtr, READ_SIZE(getheader(oldPtr)));
+		coalesce(oldPtr);
+		return newPtr; 
+	}
+
+
+
+
+
+
 }
+
 
 
 
