@@ -389,7 +389,7 @@ static int mm_check(void){
 		while(blockPtr != NULL){
 			if(READ_ALLOC(getHeader(blockPtr))){
 				//different from peter, didnot use getheader
-				print("block is not marked as free");
+				printf("block is not marked as free");
 				errorCode = -1;
 			}
 			blockPtr = seg_prev_block(blockPtr);
@@ -465,7 +465,7 @@ int mm_init(void)
 
   //initialize the list and set all blocks to null
   for(listIndex = 0; listIndex < LISTCOUNT; listIndex++){
-    seg_getIndex(segregatedListPtr, listIndex);
+    seg_getIndex(segregatedListPtr, listIndex) = NULL;
   }
 
   //create the heap
