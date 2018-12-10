@@ -331,20 +331,16 @@ static void removeFreeBlock(void* p){
   int listIndex = 0;
 
   /* find list index of block we want to insert - same idea as with removeFreeBlock */
-  for(blockSize; blockSize > 1; blockSize >> 1){
-    if(listIndex >= (LISTCOUNT - 1)){
-      break;
-    }
+  while((listIndex < (LISTCOUNT - 1)) && (blockSize > 1)){
+    blockSize = blockSize >> 1;
     listIndex++;
   }
 
   pointerToList = seg_getIndex(segregatedListPtr, listIndex);
   /* find location to insert, making sure list is sorted by block size */
-  for(pointerToList; blockSize <= READ_SIZE(getHeader(pointerToList)); pointerToList = seg_prev_block(listIndex)){
-    if(pointerToList == NULL){
-      break;
-    }
+  while ((pointerToList != NULL) && (blockSize > GET_SIZE(HDRP(pointerToList)))) {
     locationToInsert = pointerToList;
+    pointerToList = GET_PREV_BLK(pointerToList);
   }
 
   /* There are four possible combinations as to where to insert the free block: */
